@@ -18,5 +18,5 @@ USER appuser
 ENV PORT=8002
 EXPOSE 8002
 
-# Start the application
-CMD ["sh", "-c", "uvicorn src.main:app --host 0.0.0.0 --port ${PORT}"]
+# Start the application (will be overridden by railway.toml)
+CMD ["uvicorn", "src.main:app", "--host", "0.0.0.0", "--port", "8002"]
