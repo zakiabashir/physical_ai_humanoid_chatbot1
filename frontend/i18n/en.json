@@ -1,0 +1,28 @@
+{
+  "version": "0.0.1",
+  "tagline": {
+    "title": "AI-Native Textbook Platform",
+    "message": "Physical AI & Humanoid Robotics"
+  },
+  "navbar": {
+    "title": "Physical AI Textbook",
+    "items": {
+      "chapters": "Chapters",
+      "github": "GitHub"
+    }
+  },
+  "footer": {
+    "chapters": "Chapters",
+    "more": "More",
+    "copyright": "Built with Docusaurus. {year} AI Textbook Platform."
+  },
+  "chapters": {
+    "intro": "Introduction",
+    "chapter-01": "Physical AI Foundations",
+    "chapter-02": "ROS 2",
+    "chapter-03": "Gazebo & Digital Twins",
+    "chapter-04": "NVIDIA Isaac",
+    "chapter-05": "Vision-Language-Action Models",
+    "chapter-06": "Capstone Project"
+  }
+}

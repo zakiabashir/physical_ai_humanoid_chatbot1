@@ -1,0 +1,490 @@
+openapi: 3.0.3
+info:
+  title: Auth Service API
+  description: Authentication and user management API for AI-Native Textbook Platform
+  version: 1.0.0
+  contact:
+    name: Platform Team
+
+servers:
+  - url: http://localhost:8001
+    description: Local development
+  - url: https://auth-service.production.railway.app
+    description: Production (Railway)
+
+tags:
+  - name: auth
+    description: Authentication operations
+  - name: users
+    description: User profile management
+  - name: health
+    description: Health check
+
+paths:
+  /health:
+    get:
+      tags: [health]
+      summary: Health check
+      description: Check if the service is running
+      operationId: healthCheck
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: ok
+
+  /auth/signup:
+    post:
+      tags: [auth]
+      summary: Create new account
+      description: Register a new user with email and password
+      operationId: signup
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password, display_name]
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: user@example.com
+                password:
+                  type: string
+                  format: password
+                  minLength: 8
+                  example: securepassword123
+                display_name:
+                  type: string
+                  maxLength: 100
+                  example: John Doe
+                preferred_language:
+                  type: string
+                  enum: [en, ur]
+                  default: en
+                  example: en
+      responses:
+        '201':
+          description: Account created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  /auth/login:
+    post:
+      tags: [auth]
+      summary: Login with email/password
+      description: Authenticate user and receive session token
+      operationId: login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email:
+                  type: string
+                  format: email
+                password:
+                  type: string
+                  format: password
+                remember_me:
+                  type: boolean
+                  default: false
+      responses:
+        '200':
+          description: Login successful
+          headers:
+            Set-Cookie:
+              schema:
+                type: string
+                example: session_token=xyz; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=604800
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /auth/logout:
+    post:
+      tags: [auth]
+      summary: Logout
+      description: Clear session cookie
+      operationId: logout
+      security:
+        - CookieAuth: []
+      responses:
+        '200':
+          description: Logged out successfully
+          headers:
+            Set-Cookie:
+              schema:
+                type: string
+                example: session_token=; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=0
+
+  /auth/oauth/google:
+    get:
+      tags: [auth]
+      summary: Initiate Google OAuth
+      description: Redirect to Google OAuth consent screen
+      operationId: oauthGoogle
+      parameters:
+        - name: redirect_uri
+          in: query
+          schema:
+            type: string
+          description: Callback URL after OAuth
+      responses:
+        '302':
+          description: Redirect to Google OAuth
+
+  /auth/oauth/google/callback:
+    get:
+      tags: [auth]
+      summary: Google OAuth callback
+      description: Handle OAuth callback from Google
+      operationId: oauthGoogleCallback
+      parameters:
+        - name: code
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: state
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        '302':
+          description: Redirect to frontend with session
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /auth/oauth/github:
+    get:
+      tags: [auth]
+      summary: Initiate GitHub OAuth
+      description: Redirect to GitHub OAuth consent screen
+      operationId: oauthGithub
+      parameters:
+        - name: redirect_uri
+          in: query
+          schema:
+            type: string
+      responses:
+        '302':
+          description: Redirect to GitHub OAuth
+
+  /auth/oauth/github/callback:
+    get:
+      tags: [auth]
+      summary: GitHub OAuth callback
+      description: Handle OAuth callback from GitHub
+      operationId: oauthGithubCallback
+      parameters:
+        - name: code
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        '302':
+          description: Redirect to frontend with session
+
+  /auth/verify-email:
+    post:
+      tags: [auth]
+      summary: Verify email address
+      description: Verify email with token sent to user
+      operationId: verifyEmail
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token]
+              properties:
+                token:
+                  type: string
+      responses:
+        '200':
+          description: Email verified successfully
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          description: Token not found or expired
+
+  /auth/resend-verification:
+    post:
+      tags: [auth]
+      summary: Resend verification email
+      description: Send new verification email
+      operationId: resendVerification
+      security:
+        - CookieAuth: []
+      responses:
+        '200':
+          description: Verification email sent
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /auth/forgot-password:
+    post:
+      tags: [auth]
+      summary: Request password reset
+      description: Send password reset email
+      operationId: forgotPassword
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email:
+                  type: string
+                  format: email
+      responses:
+        '200':
+          description: Password reset email sent
+        '404':
+          description: Email not found (still return 200 for security)
+
+  /auth/reset-password:
+    post:
+      tags: [auth]
+      summary: Reset password
+      description: Reset password with token
+      operationId: resetPassword
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token, new_password]
+              properties:
+                token:
+                  type: string
+                new_password:
+                  type: string
+                  format: password
+                  minLength: 8
+      responses:
+        '200':
+          description: Password reset successfully
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /users/me:
+    get:
+      tags: [users]
+      summary: Get current user profile
+      description: Retrieve authenticated user's profile
+      operationId: getCurrentUser
+      security:
+        - CookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+    put:
+      tags: [users]
+      summary: Update current user profile
+      description: Update user profile information
+      operationId: updateCurrentUser
+      security:
+        - CookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                display_name:
+                  type: string
+                  maxLength: 100
+                preferred_language:
+                  type: string
+                  enum: [en, ur]
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+    delete:
+      tags: [users]
+      summary: Delete current user account
+      description: Permanently delete user account and all data
+      operationId: deleteCurrentUser
+      security:
+        - CookieAuth: []
+      responses:
+        '204':
+          description: Account deleted successfully
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /users/me/export:
+    get:
+      tags: [users]
+      summary: Export user data
+      description: Export all user data (GDPR compliance)
+      operationId: exportUserData
+      security:
+        - CookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserExport'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+components:
+  securitySchemes:
+    CookieAuth:
+      type: apiKey
+      in: cookie
+      name: session_token
+
+  schemas:
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+          format: email
+        display_name:
+          type: string
+        preferred_language:
+          type: string
+          enum: [en, ur]
+        is_verified:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+        last_active:
+          type: string
+          format: date-time
+
+    UserExport:
+      type: object
+      properties:
+        user:
+          $ref: '#/components/schemas/User'
+        progress_records:
+          type: array
+          items:
+            $ref: '#/components/schemas/ProgressRecord'
+        bookmarks:
+          type: array
+          items:
+            $ref: '#/components/schemas/Bookmark'
+
+    ProgressRecord:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        chapter_id:
+          type: string
+        status:
+          type: string
+          enum: [not_started, in_progress, complete]
+        last_position:
+          type: string
+          nullable: true
+        updated_at:
+          type: string
+          format: date-time
+
+    Bookmark:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        chapter_id:
+          type: string
+        section_id:
+          type: string
+        note:
+          type: string
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+
+    Error:
+      type: object
+      properties:
+        detail:
+          type: string
+          example: Error message here
+
+  responses:
+    BadRequest:
+      description: Bad request
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+    Unauthorized:
+      description: Unauthorized
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+    Conflict:
+      description: Conflict (email already exists)
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'

@@ -1,0 +1,424 @@
+openapi: 3.0.3
+info:
+  title: Personalization Service API
+  description: Progress tracking, bookmarks, and recommendations API for AI-Native Textbook Platform
+  version: 1.0.0
+  contact:
+    name: Platform Team
+
+servers:
+  - url: http://localhost:8003
+    description: Local development
+  - url: https://personalization-service.production.railway.app
+    description: Production (Railway)
+
+tags:
+  - name: progress
+    description: Reading progress tracking
+  - name: bookmarks
+    description: User bookmarks
+  - name: recommendations
+    description: Personalized recommendations
+  - name: health
+    description: Health check
+
+paths:
+  /health:
+    get:
+      tags: [health]
+      summary: Health check
+      operationId: healthCheck
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: ok
+
+  /progress:
+    get:
+      tags: [progress]
+      summary: Get user progress
+      description: Retrieve reading progress for all chapters
+      operationId: getProgress
+      security:
+        - CookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ProgressRecord'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /progress/{chapter_id}:
+    get:
+      tags: [progress]
+      summary: Get progress for specific chapter
+      operationId: getChapterProgress
+      security:
+        - CookieAuth: []
+      parameters:
+        - name: chapter_id
+          in: path
+          required: true
+          schema:
+            type: string
+            example: chapter-01-foundations
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProgressRecord'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    put:
+      tags: [progress]
+      summary: Update chapter progress
+      description: Update reading progress for a chapter
+      operationId: updateProgress
+      security:
+        - CookieAuth: []
+      parameters:
+        - name: chapter_id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                status:
+                  type: string
+                  enum: [not_started, in_progress, complete]
+                last_position:
+                  type: string
+                  description: Section identifier
+                  example: embodied-intelligence
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProgressRecord'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /progress/summary:
+    get:
+      tags: [progress]
+      summary: Get progress summary
+      description: Get overall progress statistics
+      operationId: getProgressSummary
+      security:
+        - CookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProgressSummary'
+
+  /bookmarks:
+    get:
+      tags: [bookmarks]
+      summary: List user bookmarks
+      operationId: listBookmarks
+      security:
+        - CookieAuth: []
+      parameters:
+        - name: chapter_id
+          in: query
+          schema:
+            type: string
+          description: Filter by chapter (optional)
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Bookmark'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+    post:
+      tags: [bookmarks]
+      summary: Create bookmark
+      operationId: createBookmark
+      security:
+        - CookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [chapter_id, section_id]
+              properties:
+                chapter_id:
+                  type: string
+                  example: chapter-01-foundations
+                section_id:
+                  type: string
+                  example: embodied-intelligence
+                note:
+                  type: string
+                  maxLength: 1000
+                  example: Important concept to review
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Bookmark'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  /bookmarks/{bookmark_id}:
+    get:
+      tags: [bookmarks]
+      summary: Get bookmark
+      operationId: getBookmark
+      security:
+        - CookieAuth: []
+      parameters:
+        - name: bookmark_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Bookmark'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    put:
+      tags: [bookmarks]
+      summary: Update bookmark
+      operationId: updateBookmark
+      security:
+        - CookieAuth: []
+      parameters:
+        - name: bookmark_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                note:
+                  type: string
+                  maxLength: 1000
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Bookmark'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    delete:
+      tags: [bookmarks]
+      summary: Delete bookmark
+      operationId: deleteBookmark
+      security:
+        - CookieAuth: []
+      parameters:
+        - name: bookmark_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Bookmark deleted
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /recommendations:
+    get:
+      tags: [recommendations]
+      summary: Get personalized recommendations
+      description: Get recommended next chapters based on reading progress
+      operationId: getRecommendations
+      security:
+        - CookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Recommendation'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+components:
+  securitySchemes:
+    CookieAuth:
+      type: apiKey
+      in: cookie
+      name: session_token
+
+  schemas:
+    ProgressRecord:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        chapter_id:
+          type: string
+          example: chapter-01-foundations
+        status:
+          type: string
+          enum: [not_started, in_progress, complete]
+        last_position:
+          type: string
+          nullable: true
+          example: embodied-intelligence
+        updated_at:
+          type: string
+          format: date-time
+
+    ProgressSummary:
+      type: object
+      properties:
+        total_chapters:
+          type: integer
+          example: 6
+        completed_chapters:
+          type: integer
+          example: 2
+        in_progress_chapters:
+          type: integer
+          example: 1
+        completion_percentage:
+          type: number
+          format: float
+          example: 33.33
+        current_chapter:
+          type: string
+          nullable: true
+          example: chapter-03-gazebo
+        streak_days:
+          type: integer
+          description: Consecutive days of reading
+          example: 5
+
+    Bookmark:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        chapter_id:
+          type: string
+          example: chapter-01-foundations
+        section_id:
+          type: string
+          example: embodied-intelligence
+        note:
+          type: string
+          nullable: true
+          example: Key concept
+        created_at:
+          type: string
+          format: date-time
+
+    Recommendation:
+      type: object
+      properties:
+        chapter_id:
+          type: string
+          example: chapter-03-gazebo
+        chapter_title:
+          type: string
+          example: Gazebo & Digital Twins
+        reason:
+          type: string
+          enum: [sequential, bookmark_based, foundational]
+          example: sequential
+        description:
+          type: string
+          example: Continue to the next chapter in sequence
+
+    Error:
+      type: object
+      properties:
+        detail:
+          type: string
+
+  responses:
+    BadRequest:
+      description: Bad request
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+    Unauthorized:
+      description: Unauthorized
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+    Conflict:
+      description: Conflict (resource already exists)
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'

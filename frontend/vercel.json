@@ -1,0 +1,12 @@
+{
+  "buildCommand": "npm run build",
+  "outputDirectory": "build",
+  "framework": "docusaurus",
+  "devCommand": "npm run start",
+  "installCommand": "npm install",
+  "env": {
+    "NEXT_PUBLIC_AUTH_API_URL": "@auth_service_url",
+    "NEXT_PUBLIC_CHATBOT_API_URL": "@chatbot_service_url",
+    "NEXT_PUBLIC_PERSONALIZATION_API_URL": "@personalization_service_url"
+  }
+}

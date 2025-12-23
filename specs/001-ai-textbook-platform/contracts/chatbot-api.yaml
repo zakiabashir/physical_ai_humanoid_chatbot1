@@ -1,0 +1,207 @@
+openapi: 3.0.3
+info:
+  title: Chatbot Service API
+  description: RAG-based chatbot API for AI-Native Textbook Platform
+  version: 1.0.0
+  contact:
+    name: Platform Team
+
+servers:
+  - url: http://localhost:8002
+    description: Local development
+  - url: https://chatbot-service.production.railway.app
+    description: Production (Railway)
+
+tags:
+  - name: chat
+    description: Chatbot operations
+  - name: health
+    description: Health check
+
+paths:
+  /health:
+    get:
+      tags: [health]
+      summary: Health check
+      description: Check if the service is running
+      operationId: healthCheck
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: ok
+                  qdrant:
+                    type: string
+                    example: connected
+
+  /chat/question:
+    post:
+      tags: [chat]
+      summary: Ask a question
+      description: Submit a question about textbook content and receive AI-generated answer
+      operationId: askQuestion
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [question]
+              properties:
+                question:
+                  type: string
+                  description: The user's question
+                  example: What is embodied intelligence?
+                  minLength: 5
+                  maxLength: 1000
+                selected_text:
+                  type: string
+                  description: Optional selected text to limit context
+                  example: "Embodied intelligence is..."
+                  maxLength: 5000
+                language:
+                  type: string
+                  description: Language code (auto-detected if not provided)
+                  enum: [en, ur]
+                  default: en
+      responses:
+        '200':
+          description: Answer generated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChatResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '429':
+          $ref: '#/components/responses/RateLimitExceeded'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+
+  /chat/streams:
+    post:
+      tags: [chat]
+      summary: Ask question with streaming response
+      description: Submit a question and receive streaming response (Server-Sent Events)
+      operationId: askQuestionStream
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [question]
+              properties:
+                question:
+                  type: string
+                  minLength: 5
+                  maxLength: 1000
+                selected_text:
+                  type: string
+                  maxLength: 5000
+                language:
+                  type: string
+                  enum: [en, ur]
+                  default: en
+      responses:
+        '200':
+          description: Streaming response
+          content:
+            text/event-stream:
+              schema:
+                type: string
+                description: Server-Sent Events stream
+
+components:
+  schemas:
+    ChatResponse:
+      type: object
+      properties:
+        answer:
+          type: string
+          description: AI-generated answer
+          example: Embodied intelligence refers to AI systems that interact with physical environments through sensors and actuators...
+        sources:
+          type: array
+          description: Source references from textbook
+          items:
+            $ref: '#/components/schemas/Source'
+        language:
+          type: string
+          enum: [en, ur]
+          description: Response language
+        out_of_scope:
+          type: boolean
+          description: True if question is outside textbook scope
+          example: false
+        suggested_chapters:
+          type: array
+          description: Suggested chapters if out of scope
+          items:
+            type: string
+            example: chapter-01-foundations
+
+    Source:
+      type: object
+      properties:
+        chapter_id:
+          type: string
+          example: chapter-01-foundations
+        chapter_title:
+          type: string
+          example: Physical AI Foundations
+        section_id:
+          type: string
+          example: embodied-intelligence
+        section_title:
+          type: string
+          example: What is Embodied Intelligence?
+        url:
+          type: string
+          example: /en/chapter-01-foundations#embodied-intelligence
+
+    Error:
+      type: object
+      properties:
+        detail:
+          type: string
+          example: Error message here
+
+  responses:
+    BadRequest:
+      description: Bad request
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+    RateLimitExceeded:
+      description: Rate limit exceeded
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              detail:
+                type: string
+                example: Rate limit exceeded. Please try again later.
+              retry_after:
+                type: integer
+                description: Seconds to wait before retrying
+
+    ServiceUnavailable:
+      description: Service temporarily unavailable
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              detail:
+                type: string
+                example: Chatbot service is temporarily unavailable. Please try again later.
